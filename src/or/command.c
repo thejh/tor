@@ -589,6 +589,8 @@ command_process_destroy_cell(cell_t *cell, or_connection_t *conn)
 {
   circuit_t *circ;
   int reason;
+  
+  log_notice(LD_OR, "CIRCUIT WAS DESTROYED");
 
   circ = circuit_get_by_circid_orconn(cell->circ_id, conn);
   if (!circ) {

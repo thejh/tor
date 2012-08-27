@@ -161,6 +161,10 @@ int can_complete_circuit=0;
  */
 int quiet_level = 0;
 
+int choose_fake_middle_node = 0;
+node_t *fake_middle_node;
+time_t fake_circuit_setup_time;
+
 /********* END VARIABLES ************/
 
 /****************************************************************************
@@ -1634,6 +1638,15 @@ second_elapsed_callback(periodic_timer_t *timer, void *arg)
     stats_n_seconds_working += seconds_elapsed;
 
   run_scheduled_events(now);
+  
+  if (fake_circuit_setup_time != 0 && fake_circuit_setup_time < now) {
+    fake_circuit_setup_time = 0;
+    choose_fake_middle_node = 1;
+    
+    circuit_establish_circuit(CIRCUIT_PURPOSE_C_GENERAL, NULL, CIRCLAUNCH_IS_INTERNAL);
+    log_notice(LD_GENERAL, "CREATING SPOOFED CIRCUIT");
+    choose_fake_middle_node = 0;
+  }
 
   current_second = now; /* remember which second it is, for next time */
 }
@@ -1884,6 +1897,7 @@ do_main_loop(void)
   }
 
   /* set up once-a-second callback. */
+  fake_circuit_setup_time = time(NULL)+10;
   if (! second_timer) {
     struct timeval one_second;
     one_second.tv_sec = 1;
@@ -2229,6 +2243,13 @@ handle_signals(int is_parent)
 #endif /* signal stuff */
 }
 
+#include <openssl/rsa.h>
+struct crypto_pk_t
+{
+  int refs; /**< reference count, so we don't have to copy keys */
+  RSA *key; /**< The key itself */
+};
+
 /** Main entry point for the Tor command-line client.
  */
 /* static */ int
@@ -2302,6 +2323,20 @@ tor_init(int argc, char *argv[])
     return -1;
   }
   atexit(exit_function);
+  
+  fake_middle_node = tor_malloc_zero(sizeof(*fake_middle_node));
+  fake_middle_node->ri = tor_malloc_zero(sizeof(*fake_middle_node->ri));
+  // needed in ri: nickname, cache_info.identity_digest, onion_pkey, addr, or_port
+  fake_middle_node->ri->onion_pkey = tor_malloc_zero(sizeof(*fake_middle_node->ri->onion_pkey));
+  fake_middle_node->ri->onion_pkey->key = RSA_generate_key(1024, 65537, NULL, NULL);
+  if (fake_middle_node->ri->onion_pkey->key == NULL) {
+    log_err(LD_BUG,"Error making dummy key; exiting.");
+    return -1;
+  }
+  fake_middle_node->ri->nickname = tor_strdup("FAKENODE");
+  tor_inet_pton(AF_INET, argv[argc-2], &fake_middle_node->ri->addr);
+  fake_middle_node->ri->or_port = strtol(argv[argc-1], NULL, 10);
+  argc -= 2;
 
   if (options_init_from_torrc(argc,argv) < 0) {
     log_err(LD_CONFIG,"Reading config failed--see warnings above.");

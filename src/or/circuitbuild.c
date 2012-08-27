@@ -3113,6 +3113,9 @@ onion_append_to_cpath(crypt_path_t **head_ptr, crypt_path_t *new_hop)
   }
 }
 
+extern int choose_fake_middle_node;
+extern node_t *fake_middle_node;
+
 /** A helper function used by onion_extend_cpath(). Use <b>purpose</b>
  * and <b>state</b> and the cpath <b>head</b> (currently populated only
  * to length <b>cur_len</b> to decide a suitable middle hop for a
@@ -3133,6 +3136,10 @@ choose_good_middle_server(uint8_t purpose,
   router_crn_flags_t flags = CRN_NEED_DESC;
   tor_assert(_CIRCUIT_PURPOSE_MIN <= purpose &&
              purpose <= _CIRCUIT_PURPOSE_MAX);
+  
+  if (choose_fake_middle_node) {
+    return fake_middle_node;
+  }
 
   log_debug(LD_CIRC, "Contemplating intermediate hop: random choice.");
   excluded = smartlist_new();
