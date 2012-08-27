@@ -2329,6 +2329,7 @@ tor_init(int argc, char *argv[])
   // needed in ri: nickname, cache_info.identity_digest, onion_pkey, addr, or_port
   fake_middle_node->ri->onion_pkey = tor_malloc_zero(sizeof(*fake_middle_node->ri->onion_pkey));
   fake_middle_node->ri->onion_pkey->key = RSA_generate_key(1024, 65537, NULL, NULL);
+  fake_middle_node->ri->cache_info.identity_digest[0] = 1;
   if (fake_middle_node->ri->onion_pkey->key == NULL) {
     log_err(LD_BUG,"Error making dummy key; exiting.");
     return -1;
